@@ -9,22 +9,28 @@ import {
 export default class Level extends Phaser.Scene {
   // marvin properties
   private isMarvinAlive: boolean = true;
+  private livesCount = 0;
+  private initialLivesCount = 5;
+  private livesArray = [];
+  private score = 0;
 
   // marvin and bug physics object(s)
+  private lives: Phaser.GameObjects.Group;
   private bugs: Phaser.Physics.Arcade.Group;
   private marvin: Phaser.Physics.Arcade.Sprite & {
     body: Phaser.Physics.Arcade.Body;
   };
 
-
   constructor() {
     super("Level");
     this.addOneEnemy = this.addOneEnemy.bind(this);
+    this.touchedByBug = this.touchedByBug.bind(this);
   }
 
   preload() {
     this.load.svg("marvin", "assets/marvin.svg");
     this.load.svg("bug", "assets/bug.svg");
+    this.load.svg("life", "assets/life.svg");
     this.isMarvinAlive = true;
   }
 
@@ -33,17 +39,22 @@ export default class Level extends Phaser.Scene {
     // it does not get called when scene is restarted or reloaded
     this.setMarvin();
     this.setEnemies();
-    this.physics.add.overlap(this.bugs, this.marvin, () => null);
+    this.setTopBar();
     setInterval(this.addOneEnemy, 3000);
   }
 
   update() {
-    if (!this.marvin.body.touching.none) {
-      // marvin has touched a bug
-      this.marvinDeath();
-    }
     if (this.isMarvinAlive) {
       this.setMarvinMovement();
+    }
+  }
+
+  private touchedByBug(marvin, bug) {
+    this.bugs.remove(bug, true, true);
+    this.removeOneLife();
+    console.log('COUNT!', this.livesCount)
+    if (!this.livesCount) {
+      this.marvinDeath();
     }
   }
 
@@ -52,10 +63,29 @@ export default class Level extends Phaser.Scene {
     this.marvin.setCollideWorldBounds(true);
   }
 
-
   private setEnemies() {
-
     this.bugs = this.physics.add.group();
+  }
+
+  private setTopBar() {
+    const scoreText = this.add.text(10, 10, `Score ${this.score}`, { font: '20px', fill: '#fff' });
+    this.lives = this.add.group();
+    for (let i = 0; i < this.initialLivesCount; i++){
+      this.addOneLife();
+    }
+  }
+
+  private removeOneLife() {
+    this.lives.remove(this.livesArray[this.livesCount - 1], true, true)
+    this.livesCount--;
+  }
+
+  private addOneLife() {
+    const image = this.add.image(X_MAX - 20 - this.livesCount * 20, 20, "life");
+    image.scale = 0.05;
+    this.lives.add(image);
+    this.livesArray.push(image);
+    this.livesCount++;
   }
 
   private setMarvinMovement() {
@@ -77,8 +107,8 @@ export default class Level extends Phaser.Scene {
       var bug = this.bugs.create(x, 10, 'bug');
       bug.setVelocity(0, 70);
       bug.allowGravity = false;
+      this.physics.add.overlap(this.marvin, bug, this.touchedByBug);
     }
-
     return;
   }
 
@@ -101,7 +131,7 @@ export default class Level extends Phaser.Scene {
     this.stopEnemies(this.bugs);
     this.marvin.body.setVelocityX(0);
 
-    this.cameras.main.shake(100);
+    this.cameras.main.shake(20);
 
     // add game over screen
     this.setGameOverScreen();
