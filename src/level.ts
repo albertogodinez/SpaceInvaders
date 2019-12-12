@@ -1,6 +1,5 @@
+//TODO: Add a sentence just after click on START GAME (like "Ready? Go!")
 import {
-  BUG_HEIGHT,
-  BUG_WIDTH,
   FONT_FAMILY,
   X_MAX,
   Y_MAX
@@ -17,20 +16,26 @@ export default class Level extends Phaser.Scene {
   // marvin and bug physics object(s)
   private lives: Phaser.GameObjects.Group;
   private bugs: Phaser.Physics.Arcade.Group;
+  private receipts: Phaser.Physics.Arcade.Group;
   private marvin: Phaser.Physics.Arcade.Sprite & {
     body: Phaser.Physics.Arcade.Body;
   };
+  private scoreText;
 
   constructor() {
     super("Level");
-    this.addOneEnemy = this.addOneEnemy.bind(this);
+    this.addOneBug = this.addOneBug.bind(this);
+    this.addOneReceipt = this.addOneReceipt.bind(this);
     this.touchedByBug = this.touchedByBug.bind(this);
+    setInterval((this.addOneBug), 3000);
+    setInterval((this.addOneReceipt), 2800);
   }
 
   preload() {
     this.load.svg("marvin", "assets/marvin.svg");
     this.load.svg("bug", "assets/bug.svg");
     this.load.svg("life", "assets/life.svg");
+    this.load.svg("receipt", "assets/receipt.svg")
     this.isMarvinAlive = true;
   }
 
@@ -38,9 +43,14 @@ export default class Level extends Phaser.Scene {
     // ** NOTE: create() is only called the first time the scene is created
     // it does not get called when scene is restarted or reloaded
     this.setMarvin();
-    this.setEnemies();
+    this.setBugs();
     this.setTopBar();
-    setInterval(this.addOneEnemy, 3000);
+    this.setReceipts();
+    this.physics.add.overlap(this.bugs, this.marvin, () => null);
+    this.physics.add.overlap(this.receipts, this.marvin, this.collectReceipt, null, this);
+    this.score = 0;
+    this.scoreText = this.add.text(16, 16, 'score: 0', { fontSize: '32px', fill: '#000' });
+
   }
 
   update() {
@@ -60,19 +70,23 @@ export default class Level extends Phaser.Scene {
 
   private setMarvin() {
     this.marvin = this.physics.add.image(X_MAX / 2, Y_MAX, "marvin") as any;
+    this.marvin.setScale(0.7);
     this.marvin.setCollideWorldBounds(true);
   }
 
-  private setEnemies() {
+  private setBugs() {
     this.bugs = this.physics.add.group();
   }
 
   private setTopBar() {
-    const scoreText = this.add.text(10, 10, `Score ${this.score}`, { font: '20px', fill: '#fff' });
     this.lives = this.add.group();
     for (let i = 0; i < this.initialLivesCount; i++){
       this.addOneLife();
     }
+  }
+
+  private setReceipts() {
+    this.receipts = this.physics.add.group();
   }
 
   private removeOneLife() {
@@ -100,21 +114,36 @@ export default class Level extends Phaser.Scene {
     }
   }
 
-  private addOneEnemy(): any {
-    //TODO: when marvin touches an ennemy, the ennemy disappears
+  private addOneBug() {
     if (this.isMarvinAlive) {
-      const x = Phaser.Math.Between(10, 750)
+      const x = Phaser.Math.Between(70, 730)
       var bug = this.bugs.create(x, 10, 'bug');
-      bug.setVelocity(0, 70);
+      bug.setScale(0.5);
+      bug.setVelocity(0, 200);
       bug.allowGravity = false;
       this.physics.add.overlap(this.marvin, bug, this.touchedByBug);
     }
-    return;
   }
 
-  private stopEnemies(enemyGroup: Phaser.Physics.Arcade.Group) {
+  private addOneReceipt() {
+    if (this.isMarvinAlive) {
+      const x = Phaser.Math.Between(70, 730)
+      var receipt = this.receipts.create(x, 10, 'receipt');
+      receipt.setScale(0.7);
+      receipt.setVelocity(0, 300);
+      receipt.allowGravity = false;
+    }
+  }
+
+  private collectReceipt(marvin, receipt) {
+    receipt.disableBody(true, true);
+    this.score += 1;
+    this.scoreText.setText('score: ' + this.score);
+  }
+
+  private stopBugs(bugs: Phaser.Physics.Arcade.Group) {
     Phaser.Actions.Call(
-      enemyGroup.getChildren(),
+      bugs.getChildren(),
       (go: any) => {
         go.setVelocityX(0);
       },
@@ -128,7 +157,10 @@ export default class Level extends Phaser.Scene {
    */
   private marvinDeath() {
     this.isMarvinAlive = false;
-    this.stopEnemies(this.bugs);
+    this.bugs.clear(true, true);
+    this.receipts.clear(true, true);
+    this.marvin.body.setVelocityX(0);
+    this.stopBugs(this.bugs);
     this.marvin.body.setVelocityX(0);
 
     this.cameras.main.shake(20);
